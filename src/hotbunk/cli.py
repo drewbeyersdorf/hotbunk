@@ -254,6 +254,15 @@ def _headroom_bar(value: float) -> str:
     return f"[{color}][{bar}] {pct}%[/{color}]"
 
 
+@main.command()
+@click.option("--refresh", "-r", default=2.0, type=float, help="Refresh interval in seconds")
+def monitor(refresh: float):
+    """Live terminal dashboard showing pool status, jobs, and events."""
+    from .monitor import run_monitor
+
+    run_monitor(refresh_rate=refresh)
+
+
 @main.command(name="accounts")
 def list_accounts():
     """List all registered accounts."""
