@@ -192,6 +192,16 @@ If you're running Claude Code agents, CI pipelines, training data generation, or
 
 The more accounts in the pool, the more total throughput everyone gets. It's cooperative, not competitive.
 
+## Ecosystem
+
+HotBunk is part of a toolkit for people who build with Claude Code every day.
+
+| Project | What it does |
+|---------|-------------|
+| **[HotBunk](https://github.com/drewbeyersdorf/hotbunk)** | Cooperative compute. You are here. |
+| **[codeREM](https://github.com/drewbeyersdorf/codeREM)** | Memory consolidation -- three-phase analysis + nightly automation |
+| **[prompt-poetry](https://github.com/drewbeyersdorf/prompt-poetry)** | Composable prompt engineering -- pipe transforms together like Unix commands |
+
 ## License
 
 MIT
