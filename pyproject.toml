@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [
-    { name = "Drew Beyersdorf", email = "drewbeyersdorf@gmail.com" },
+    { name = "Drew Beyersdorf" },
 ]
 keywords = [
     "claude",

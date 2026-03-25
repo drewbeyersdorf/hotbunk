@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-25
 **Status:** Approved
-**Author:** Drew Beyersdorf
+**Author:** Drew B.
 
 ## Problem
 
@@ -22,7 +22,7 @@ Each account owner defines their policy:
 
 ```yaml
 owner: drew
-email: drew@gomethodology.com
+email: drew@example.com
 interactive_priority: always    # my sessions always take precedence
 allow_automated: true           # pool can use my idle capacity
 automated_types:                # what job types I allow
@@ -168,7 +168,7 @@ NOT in V1: multi-user onboarding UI, fancy analytics, mobile app, public API.
 
 ## V2 Scope (Team rollout)
 
-- Onboard Amelia, Owen, others
+- Onboard additional team members
 - Per-user dashboard views
 - Slack notifications ("your account just picked up a militia batch")
 - Usage analytics and reporting
@@ -176,7 +176,7 @@ NOT in V1: multi-user onboarding UI, fancy analytics, mobile app, public API.
 
 ## Success Criteria
 
-- Drew can run militia on whichever account has headroom without thinking about it
+- Users can run automated jobs on whichever account has headroom without thinking about it
 - Starting an interactive session never fails because automation is hogging the account
 - Dashboard shows at a glance which accounts have capacity
 - Zero ToS violations -- every account used by its real owner, automation is opt-in overflow
