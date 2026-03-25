@@ -13,3 +13,4 @@ venv/
 *.db-journal
 .credentials.json
 accounts/
+*.egg-info/
