@@ -65,17 +65,17 @@ COOLDOWN     -> recently throttled, deprioritized for new jobs
          +-------------------+-------------------+
          |         |                   |          |
     +----+----+  +-+------+  +--------+--+  +----+----+
-    | omarchy |  | charlie|  |   nerve   |  | muscle  |
+    |  box-1  |  | box-2  |  |   box-3   |  | box-4   |
     | agent   |  | agent  |  |  agent    |  | agent   |
     +----+----+  +--------+  +-----------+  +---------+
          |
-    Drew's interactive
+    Owner's interactive
     sessions here
 ```
 
 ### Components
 
-**1. Orchestrator (nerve)**
+**1. Orchestrator (always-on-box)**
 - Python daemon, runs on nerve (always-on M4 Mini)
 - SQLite database: accounts, policies, sessions, jobs, usage history
 - Polls account usage/rate limit status
@@ -98,7 +98,7 @@ COOLDOWN     -> recently throttled, deprioritized for new jobs
 - `hotbunk dashboard` -- open dashboard in browser
 - `hotbunk setup` -- first-time credential setup
 
-**4. Dashboard (nerve:3000)**
+**4. Dashboard (always-on-box:3000)**
 - Simple web UI showing pool status
 - All accounts with current state (interactive/idle/sleeping/throttled)
 - Active automated jobs and which account they're on
@@ -119,7 +119,7 @@ Each account's credentials are stored in isolated directories:
       .credentials.json
       policy.yaml
   config.yaml              # orchestrator URL, machine ID
-  hotbunk.db               # local cache (synced from nerve)
+  hotbunk.db               # local cache (synced from always-on-box)
 ```
 
 Automated jobs launch with `CLAUDE_CONFIG_DIR=~/.hotbunk/accounts/<account>/` to use the correct credentials.
@@ -151,13 +151,13 @@ Any owner can see exactly what ran on their account and when. Any owner can revo
 - **Networking:** Tailscale (already in place)
 - **Packaging:** pip installable, single `hotbunk` command
 
-## V1 Scope (Drew's 2 accounts)
+## V1 Scope (2 accounts)
 
-Phase 1 -- just Drew, 2 accounts, proving the concept:
+Phase 1 -- 2 accounts, proving the concept:
 
 1. Credential setup for 2 accounts (work + personal)
 2. Orchestrator daemon on nerve
-3. Machine agent on omarchy + nerve
+3. Machine agent on workstation + always-on-box
 4. `hotbunk status` showing both accounts
 5. `hotbunk submit` routing automated jobs to idle account
 6. Interactive session detection (watch for `claude` processes)
