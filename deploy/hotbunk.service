@@ -1,0 +1,14 @@
+[Unit]
+Description=HotBunk Daemon - The Submarine
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+ExecStart=/home/%i/.hotbunk/.venv/bin/hotbunk daemon --log-level INFO
+Restart=on-failure
+RestartSec=30
+Environment=HOME=/home/%i
+
+[Install]
+WantedBy=multi-user.target
