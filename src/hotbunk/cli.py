@@ -11,7 +11,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from .accounts import AccountManager, ACCOUNTS_DIR
+from .accounts import AccountManager, ACCOUNTS_DIR, HOTBUNK_DIR
 from .detector import SessionDetector
 from .pool import PoolManager, AccountState
 
@@ -285,3 +285,95 @@ def list_accounts():
 
     if current:
         console.print(f"\n[dim]* = currently active[/dim]")
+
+
+@main.command()
+@click.option("--poll", "-p", default=10, type=int, help="Poll interval in seconds")
+@click.option("--max-jobs", "-j", default=2, type=int, help="Max concurrent jobs")
+@click.option("--no-retry", is_flag=True, help="Don't retry throttled jobs")
+@click.option("--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]))
+def daemon(poll: int, max_jobs: int, no_retry: bool, log_level: str):
+    """Run the always-on daemon. The submarine dives.
+
+    Monitors accounts, dispatches queued jobs to the best available
+    account, detects rate limits, and auto-retries on fresh accounts.
+
+    Designed to run in tmux or as a systemd service on an always-on machine.
+    """
+    import logging
+    from .daemon import Daemon, DaemonConfig
+
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    config = DaemonConfig(
+        poll_interval=poll,
+        max_concurrent_jobs=max_jobs,
+        retry_on_throttle=not no_retry,
+    )
+    d = Daemon(config)
+
+    console.print(f"[cyan]Daemon starting[/cyan] (poll={poll}s, max_jobs={max_jobs})")
+    console.print("[dim]Press Ctrl+C to stop.[/dim]")
+    d.run_forever()
+
+
+@main.group()
+def queue():
+    """Manage the daemon job queue."""
+    pass
+
+
+@queue.command(name="add")
+@click.argument("job_type", type=click.Choice(["militia", "training", "ci", "general"]))
+@click.option("--command", "-c", required=True, help="Command to run")
+def queue_add(job_type: str, command: str):
+    """Add a job to the daemon queue.
+
+    The daemon will pick it up and dispatch it to the best available account.
+    """
+    queue_file = HOTBUNK_DIR / "queue.jsonl"
+    queue_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(queue_file, "a") as f:
+        f.write(json.dumps({"job_type": job_type, "command": command}) + "\n")
+    console.print(f"[green]Queued {job_type} job[/green]: {command[:60]}")
+
+
+@queue.command(name="list")
+def queue_list():
+    """Show recent jobs from the database."""
+    from .db import HotBunkDB
+
+    db = HotBunkDB()
+    jobs = db.list_jobs(limit=20)
+
+    if not jobs:
+        console.print("[yellow]No jobs recorded yet.[/yellow]")
+        return
+
+    table = Table(title="Recent Jobs")
+    table.add_column("ID", style="dim")
+    table.add_column("Type")
+    table.add_column("Account", style="cyan")
+    table.add_column("Status")
+    table.add_column("Command", style="dim", max_width=40)
+
+    status_styles = {
+        "running": "[blue]running[/blue]",
+        "completed": "[green]completed[/green]",
+        "failed": "[red]failed[/red]",
+    }
+
+    for j in jobs:
+        table.add_row(
+            j["id"],
+            j["job_type"],
+            j["account"],
+            status_styles.get(j["status"], j["status"]),
+            j["command"][:40],
+        )
+
+    console.print(table)
