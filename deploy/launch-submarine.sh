@@ -1,7 +1,7 @@
 #!/bin/bash
 # Launch the HotBunk daemon in a tmux session
 # Usage: bash deploy/launch-submarine.sh
-# Or remotely: ssh charlie 'bash -s' < deploy/launch-submarine.sh
+# Or remotely: ssh gpu-rig 'bash -s' < deploy/launch-submarine.sh
 
 SESSION="submarine"
 

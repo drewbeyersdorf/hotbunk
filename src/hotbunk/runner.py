@@ -77,8 +77,10 @@ class JobRunner:
         stderr_thread = threading.Thread(target=read_stderr, daemon=True)
         stderr_thread.start()
 
-        # Let stdout flow through (or capture it)
-        stdout, _ = proc.communicate()
+        # Drain stdout in the main thread -- stderr is handled by the thread
+        if proc.stdout:
+            proc.stdout.read()
+        proc.wait()
         stderr_thread.join(timeout=5)
 
         exit_code = proc.returncode
