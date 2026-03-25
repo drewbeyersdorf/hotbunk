@@ -1,7 +1,9 @@
 """Account management -- credential storage, switching, and policy."""
 
 import json
+import os
 import shutil
+import sys
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -9,11 +11,47 @@ from typing import Optional
 
 import yaml
 
+_IS_WINDOWS = sys.platform == "win32"
 
-HOTBUNK_DIR = Path.home() / ".hotbunk"
+
+def _get_claude_dir() -> Path:
+    """Return the Claude Code config directory for this platform.
+
+    Linux/macOS: ~/.claude/
+    Windows: %APPDATA%\\claude\\
+    """
+    if _IS_WINDOWS:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "claude"
+        return Path.home() / ".claude"
+    return Path.home() / ".claude"
+
+
+def _get_hotbunk_dir() -> Path:
+    """Return the hotbunk data directory for this platform.
+
+    Linux/macOS: ~/.hotbunk/
+    Windows: %APPDATA%\\hotbunk\\
+    """
+    if _IS_WINDOWS:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "hotbunk"
+        return Path.home() / ".hotbunk"
+    return Path.home() / ".hotbunk"
+
+
+def _secure_file(path: Path) -> None:
+    """Set restrictive permissions on a file. No-op on Windows."""
+    if not _IS_WINDOWS:
+        path.chmod(0o600)
+
+
+HOTBUNK_DIR = _get_hotbunk_dir()
 ACCOUNTS_DIR = HOTBUNK_DIR / "accounts"
 CONFIG_PATH = HOTBUNK_DIR / "config.yaml"
-CLAUDE_DIR = Path.home() / ".claude"
+CLAUDE_DIR = _get_claude_dir()
 CLAUDE_CREDS = CLAUDE_DIR / ".credentials.json"
 
 
@@ -87,7 +125,7 @@ class AccountManager:
         # Copy current credentials
         creds_dest = account_dir / ".credentials.json"
         shutil.copy2(CLAUDE_CREDS, creds_dest)
-        creds_dest.chmod(0o600)
+        _secure_file(creds_dest)
 
         # Read credential metadata
         with open(CLAUDE_CREDS) as f:
@@ -149,7 +187,7 @@ class AccountManager:
 
         # Copy new credentials in
         shutil.copy2(creds_src, CLAUDE_CREDS)
-        CLAUDE_CREDS.chmod(0o600)
+        _secure_file(CLAUDE_CREDS)
         return True
 
     def refresh_credentials(self, name: str) -> bool:

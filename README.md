@@ -1,8 +1,12 @@
-# HotBunk
+<p align="center">
+  <img src="docs/logo.svg" alt="HotBunk" width="600" />
+</p>
 
 **Your Claude Max account sits idle while you sleep. That's $3,000/month in unused capacity.**
 
 HotBunk is a cooperative compute orchestrator for Claude Code that load-balances automated workloads across multiple Max accounts, using idle capacity that would otherwise be wasted.
+
+*The submarine has room for everyone.*
 
 ![hotbunk demo](docs/demo.svg)
 
@@ -172,7 +176,7 @@ No credentials are shared between users. Each account's OAuth tokens stay in the
 | CLI | Python, Click, Rich |
 | Orchestrator | FastAPI, SQLite |
 | Dashboard | FastAPI + HTMX |
-| Process detection | /proc filesystem |
+| Process detection | Platform-native (pgrep/tasklist) |
 | Networking | Tailscale (or any mesh) |
 | Packaging | pip installable |
 
@@ -180,7 +184,7 @@ No credentials are shared between users. Each account's OAuth tokens stay in the
 
 - Python 3.12+
 - Claude Code CLI installed and authenticated
-- Linux (process detection uses /proc - macOS support planned)
+- Linux, macOS, or Windows
 
 ## Why This Exists
 

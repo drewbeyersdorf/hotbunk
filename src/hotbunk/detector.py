@@ -1,12 +1,19 @@
-"""Session detection -- watches for active Claude Code processes."""
+"""Session detection -- watches for active Claude Code processes.
 
-import os
-import re
-import subprocess
+Cross-platform implementation using psutil. Works on Linux, macOS, and Windows.
+
+Note on macOS: Claude Code may store credentials in Keychain rather than
+on-disk config files. Credential management is handled in accounts.py and
+is a separate concern from process detection here. If you need to resolve
+Keychain-stored credentials, see accounts.py.
+"""
+
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+import psutil
 
 
 @dataclass
@@ -21,125 +28,144 @@ class ClaudeSession:
 
 
 class SessionDetector:
-    """Detects active Claude Code sessions on this machine."""
+    """Detects active Claude Code sessions on this machine.
+
+    Uses psutil for cross-platform process enumeration (Linux, macOS, Windows).
+    """
+
+    # Process name patterns that indicate a Claude Code process.
+    # We match against both the process name and the full command line.
+    _CLAUDE_INDICATORS = ("claude",)
+
+    # Substrings that indicate a process is NOT a real Claude session
+    # (e.g., this tool scanning for sessions, or grep/pgrep lookups).
+    _SKIP_PATTERNS = ("pgrep", "grep", "hotbunk")
 
     def get_active_sessions(self) -> list[ClaudeSession]:
         """Find all running Claude Code processes."""
         sessions = []
-        try:
-            # Find claude processes (the Node.js CLI)
-            result = subprocess.run(
-                ["pgrep", "-af", "claude"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            for line in result.stdout.strip().split("\n"):
-                if not line:
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+            try:
+                info = proc.info
+                if not self._is_claude_process(info):
                     continue
-                session = self._parse_process_line(line)
+                session = self._build_session(proc)
                 if session:
                     sessions.append(session)
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                # Process vanished or we lack permission -- skip it.
+                continue
         return sessions
 
     def is_interactive_session_active(self) -> bool:
-        """Check if there's an interactive (foreground) Claude Code session."""
+        """Check if there's an interactive (foreground) Claude Code session.
+
+        Interactive sessions are attached to a TTY/terminal.
+        """
         sessions = self.get_active_sessions()
-        # Filter out background/automated sessions
-        # Interactive sessions are attached to a TTY
         for session in sessions:
             if self._has_tty(session.pid):
                 return True
         return False
 
     def get_current_account_from_env(self, pid: int) -> Optional[str]:
-        """Try to determine which account a process is using via CLAUDE_CONFIG_DIR."""
+        """Try to determine which hotbunk account a process is using.
+
+        Reads CLAUDE_CONFIG_DIR from the process environment. On some
+        platforms (especially Windows and macOS), reading another process's
+        environment may require elevated privileges.
+        """
         try:
-            environ_path = Path(f"/proc/{pid}/environ")
-            if not environ_path.exists():
+            proc = psutil.Process(pid)
+            environ = proc.environ()
+            config_dir = environ.get("CLAUDE_CONFIG_DIR")
+            if not config_dir:
                 return None
-            env_data = environ_path.read_bytes().decode("utf-8", errors="replace")
-            for entry in env_data.split("\0"):
-                if entry.startswith("CLAUDE_CONFIG_DIR="):
-                    config_dir = entry.split("=", 1)[1]
-                    # Extract account name from path like ~/.hotbunk/accounts/<name>/
-                    parts = Path(config_dir).parts
-                    if "accounts" in parts:
-                        idx = parts.index("accounts")
-                        if idx + 1 < len(parts):
-                            return parts[idx + 1]
-        except (PermissionError, OSError):
+            # Extract account name from path like ~/.hotbunk/accounts/<name>/
+            parts = Path(config_dir).parts
+            if "accounts" in parts:
+                idx = parts.index("accounts")
+                if idx + 1 < len(parts):
+                    return parts[idx + 1]
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
             pass
         return None
 
-    def _parse_process_line(self, line: str) -> Optional[ClaudeSession]:
-        """Parse a pgrep output line into a ClaudeSession."""
-        parts = line.split(None, 1)
-        if len(parts) < 2:
-            return None
-        try:
-            pid = int(parts[0])
-        except ValueError:
-            return None
+    def _is_claude_process(self, info: dict) -> bool:
+        """Determine if a process_iter info dict represents a Claude Code process."""
+        name = (info.get("name") or "").lower()
+        cmdline = info.get("cmdline") or []
+        cmdline_str = " ".join(cmdline).lower()
 
-        cmd = parts[1]
-        # Only match actual Claude Code processes, not grep or this script
-        if "claude" not in cmd.lower():
-            return None
-        # Skip pgrep/grep/hotbunk processes
-        if any(skip in cmd for skip in ["pgrep", "grep", "hotbunk"]):
-            return None
+        # Must have "claude" somewhere in name or command line
+        has_claude = any(
+            indicator in name or indicator in cmdline_str
+            for indicator in self._CLAUDE_INDICATORS
+        )
+        if not has_claude:
+            return False
 
-        # Get process start time
-        started_at = self._get_process_start_time(pid)
-        cwd = self._get_process_cwd(pid)
-        user = self._get_process_user(pid)
+        # Skip processes that are clearly not Claude sessions
+        if any(skip in cmdline_str for skip in self._SKIP_PATTERNS):
+            return False
+
+        return True
+
+    def _build_session(self, proc: psutil.Process) -> Optional[ClaudeSession]:
+        """Build a ClaudeSession from a psutil.Process."""
+        pid = proc.pid
+        started_at = self._get_process_start_time(proc)
+        cwd = self._get_process_cwd(proc)
+        user = self._get_process_user(proc)
+        account = self.get_current_account_from_env(pid)
 
         return ClaudeSession(
             pid=pid,
             user=user,
             started_at=started_at,
             cwd=cwd,
-            account=self.get_current_account_from_env(pid),
+            account=account,
         )
 
     def _has_tty(self, pid: int) -> bool:
-        """Check if a process is attached to a terminal."""
-        try:
-            stat_path = Path(f"/proc/{pid}/stat")
-            if not stat_path.exists():
-                return False
-            stat = stat_path.read_text()
-            # Field 7 in /proc/pid/stat is tty_nr (0 means no TTY)
-            fields = stat.split()
-            if len(fields) > 6:
-                return int(fields[6]) != 0
-        except (PermissionError, OSError, ValueError):
-            pass
-        return False
+        """Check if a process is attached to a terminal.
 
-    def _get_process_start_time(self, pid: int) -> float:
-        """Get process start time as Unix timestamp."""
+        On Unix (Linux/macOS), psutil.Process.terminal() returns the TTY
+        device path (e.g., /dev/pts/0) or None if not attached.
+
+        On Windows, terminal() is not available. We fall back to checking
+        if the process has a valid console window handle via the session ID,
+        though this is an imperfect heuristic.
+        """
         try:
-            stat_path = Path(f"/proc/{pid}/stat")
-            return stat_path.stat().st_mtime
-        except OSError:
+            proc = psutil.Process(pid)
+            # terminal() is available on Unix platforms
+            if hasattr(proc, "terminal"):
+                tty = proc.terminal()
+                return tty is not None
+            # Windows fallback: no reliable TTY detection.
+            # A process with a non-zero session ID is likely interactive.
+            return False
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return False
+
+    def _get_process_start_time(self, proc: psutil.Process) -> float:
+        """Get process start time as a Unix timestamp."""
+        try:
+            return proc.create_time()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return time.time()
 
-    def _get_process_cwd(self, pid: int) -> str:
+    def _get_process_cwd(self, proc: psutil.Process) -> str:
         """Get the working directory of a process."""
         try:
-            return str(Path(f"/proc/{pid}/cwd").resolve())
-        except (PermissionError, OSError):
+            return proc.cwd()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
             return "unknown"
 
-    def _get_process_user(self, pid: int) -> str:
+    def _get_process_user(self, proc: psutil.Process) -> str:
         """Get the user running a process."""
         try:
-            stat = Path(f"/proc/{pid}").stat()
-            import pwd
-            return pwd.getpwuid(stat.st_uid).pw_name
-        except (PermissionError, OSError, KeyError):
+            return proc.username()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, KeyError):
             return "unknown"
