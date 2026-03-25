@@ -55,7 +55,7 @@ COOLDOWN     -> recently throttled, deprioritized for new jobs
 
 ```
                     +-------------------+
-                    |   nerve (always-on)|
+                    |   always-on-box (always-on)|
                     |   - orchestrator   |
                     |   - SQLite DB      |
                     |   - dashboard :3000|
@@ -112,10 +112,10 @@ Each account's credentials are stored in isolated directories:
 ```
 ~/.hotbunk/
   accounts/
-    drew-work/
+    user-work/
       .credentials.json    # OAuth tokens
       policy.yaml          # account policy
-    drew-personal/
+    user-personal/
       .credentials.json
       policy.yaml
   config.yaml              # orchestrator URL, machine ID
