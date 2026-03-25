@@ -63,7 +63,7 @@ class AccountPolicy:
     email: str
     interactive_priority: str = "always"
     allow_automated: bool = True
-    automated_types: list[str] = field(default_factory=lambda: ["militia", "training", "ci"])
+    automated_types: list[str] = field(default_factory=lambda: ["militia", "training", "ci", "general"])
     sleep_window: Optional[str] = None  # "22:00-06:00"
     availability: str = "always"  # always | workdays | weekdays | custom
     max_automated_concurrent: int = 2
