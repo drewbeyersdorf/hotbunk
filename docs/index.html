@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotBunk - Cooperative Compute for Claude Code</title>
+<meta name="description" content="Pool your Claude Max accounts. Run automated workloads on idle capacity. 30-50x cheaper than API tokens.">
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-raised: #161b22;
+  --bg-terminal: #0a0e14;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --cyan: #58d1c9;
+  --cyan-dim: rgba(88, 209, 201, 0.15);
+  --green: #3fb950;
+  --green-dim: rgba(63, 185, 80, 0.15);
+  --red: #f85149;
+  --red-dim: rgba(248, 81, 73, 0.15);
+  --yellow: #d29922;
+  --yellow-dim: rgba(210, 153, 34, 0.15);
+  --blue: #58a6ff;
+  --border: #30363d;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-mono); line-height: 1.6; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 1.5rem; }
+section { padding: 5rem 0; border-bottom: 1px solid var(--border); }
+
+/* Hero */
+.hero { text-align: center; padding: 6rem 0 5rem; }
+.hero h1 { font-size: clamp(2.5rem, 8vw, 4rem); color: var(--cyan); margin-bottom: 0.5rem; letter-spacing: -1px; }
+.hero h1 span { color: var(--text-dim); font-weight: 400; font-size: 0.5em; display: block; margin-top: 0.25rem; }
+.hero .tagline { font-size: clamp(1rem, 3vw, 1.25rem); color: var(--text-dim); max-width: 600px; margin: 1.5rem auto; line-height: 1.5; }
+.install-box { display: inline-block; background: var(--bg-terminal); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1.5rem; margin: 2rem 0 1.5rem; font-size: 1.1rem; }
+.install-box .prompt { color: var(--green); }
+.install-box .cmd { color: var(--text); }
+.hero-links { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
+.hero-links a { padding: 0.5rem 1.25rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.875rem; transition: border-color 0.2s; }
+.hero-links a:hover { border-color: var(--cyan); text-decoration: none; }
+
+/* Section titles */
+h2 { font-size: 1.5rem; color: var(--cyan); margin-bottom: 1.5rem; }
+h2 .dim { color: var(--text-dim); font-weight: 400; }
+
+/* The Math */
+.math-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 2rem 0; }
+.math-card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center; }
+.math-card .number { font-size: 2.5rem; font-weight: 700; }
+.math-card .label { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.25rem; }
+.math-card.highlight { border-color: var(--cyan); }
+.math-card.highlight .number { color: var(--cyan); }
+.math-summary { color: var(--text-dim); text-align: center; margin-top: 1.5rem; font-size: 0.95rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+/* States */
+.states-list { display: flex; flex-direction: column; gap: 1rem; margin: 1.5rem 0; }
+.state-row { display: flex; align-items: center; gap: 1rem; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+.badge { padding: 0.2rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+.badge-interactive { background: var(--cyan-dim); color: var(--cyan); }
+.badge-idle { background: var(--green-dim); color: var(--green); }
+.badge-sleeping { background: var(--blue); color: var(--bg); }
+.badge-throttled { background: var(--red-dim); color: var(--red); }
+.badge-cooldown { background: var(--yellow-dim); color: var(--yellow); }
+.state-desc { color: var(--text-dim); font-size: 0.85rem; }
+.state-auto { margin-left: auto; font-size: 0.75rem; white-space: nowrap; }
+
+/* Terminal */
+.terminal { background: var(--bg-terminal); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 2rem 0; }
+.terminal-bar { background: #1c2128; padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--border); }
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-red { background: #f85149; }
+.dot-yellow { background: #d29922; }
+.dot-green { background: #3fb950; }
+.terminal-title { color: var(--text-dim); font-size: 0.75rem; margin-left: 0.5rem; }
+.terminal-body { padding: 1.25rem; font-size: 0.8rem; line-height: 1.7; overflow-x: auto; }
+.terminal-body .g { color: var(--green); }
+.terminal-body .c { color: var(--cyan); }
+.terminal-body .r { color: var(--red); }
+.terminal-body .y { color: var(--yellow); }
+.terminal-body .d { color: var(--text-dim); }
+.terminal-body .b { color: var(--blue); }
+.terminal-body .w { color: var(--text); }
+
+/* Architecture */
+.arch-diagram { background: var(--bg-terminal); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; font-size: clamp(0.6rem, 2vw, 0.8rem); line-height: 1.5; overflow-x: auto; white-space: pre; color: var(--text-dim); text-align: center; }
+.arch-diagram .hl { color: var(--cyan); }
+.arch-desc { margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem; }
+.arch-item { display: flex; gap: 1rem; align-items: flex-start; }
+.arch-item strong { color: var(--cyan); white-space: nowrap; min-width: 120px; }
+.arch-item span { color: var(--text-dim); font-size: 0.875rem; }
+
+/* Consent */
+.consent-list { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.consent-list li { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.9rem; color: var(--text-dim); }
+.consent-list li::before { content: ''; min-width: 8px; height: 8px; margin-top: 0.45rem; border-radius: 50%; background: var(--green); }
+
+/* Quick start */
+.steps { counter-reset: step; display: flex; flex-direction: column; gap: 0.5rem; }
+.steps .step-code { background: var(--bg-terminal); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.85rem; overflow-x: auto; }
+.steps .step-label { color: var(--text-dim); font-size: 0.8rem; margin-top: 1rem; margin-bottom: 0.25rem; }
+.steps .step-label:first-child { margin-top: 0; }
+
+/* Footer */
+footer { padding: 3rem 0; text-align: center; color: var(--text-dim); font-size: 0.8rem; }
+footer a { color: var(--cyan); }
+
+/* Nav */
+nav { position: fixed; top: 0; width: 100%; background: rgba(13, 17, 23, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); z-index: 100; padding: 0.75rem 0; }
+nav .container { display: flex; justify-content: space-between; align-items: center; }
+nav .logo { color: var(--cyan); font-weight: 700; font-size: 1rem; }
+nav .links { display: flex; gap: 1.5rem; font-size: 0.8rem; }
+nav .links a { color: var(--text-dim); }
+nav .links a:hover { color: var(--cyan); text-decoration: none; }
+body { padding-top: 3rem; }
+
+/* Submarine metaphor */
+.metaphor { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
+.metaphor strong { color: var(--text); }
+
+/* Responsive */
+@media (max-width: 640px) {
+  section { padding: 3rem 0; }
+  .math-grid { grid-template-columns: 1fr; }
+  nav .links { gap: 0.75rem; font-size: 0.7rem; }
+  .state-auto { display: none; }
+  .arch-item { flex-direction: column; gap: 0.25rem; }
+  .arch-item strong { min-width: auto; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <span class="logo">hotbunk</span>
+    <div class="links">
+      <a href="#math">The Math</a>
+      <a href="#how">How It Works</a>
+      <a href="#demo">CLI</a>
+      <a href="#arch">Architecture</a>
+      <a href="#start">Quick Start</a>
+      <a href="https://github.com/drewbeyersdorf/hotbunk">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <h1>HotBunk<span>cooperative compute for Claude Code</span></h1>
+    <p class="tagline">Your Claude Max account sits idle while you sleep. That's $3,000/month in unused capacity.</p>
+    <div class="install-box">
+      <span class="prompt">$ </span><span class="cmd">pip install hotbunk</span>
+    </div>
+    <div class="hero-links">
+      <a href="https://github.com/drewbeyersdorf/hotbunk">View on GitHub</a>
+      <a href="#start">Quick Start</a>
+    </div>
+  </div>
+</section>
+
+<section id="math">
+  <div class="container">
+    <h2>// <span class="dim">the math</span></h2>
+    <div class="math-grid">
+      <div class="math-card">
+        <div class="number">$200</div>
+        <div class="label">Claude Max / month</div>
+      </div>
+      <div class="math-card">
+        <div class="number">$5-30K</div>
+        <div class="label">Equivalent API tokens / month</div>
+      </div>
+      <div class="math-card highlight">
+        <div class="number">30-50x</div>
+        <div class="label">Arbitrage per account</div>
+      </div>
+      <div class="math-card">
+        <div class="number">8 hrs</div>
+        <div class="label">Premium compute wasted per night</div>
+      </div>
+    </div>
+    <p class="math-summary">Each account has rate limits. You hit the ceiling, you wait. Meanwhile your teammate's account is doing nothing. HotBunk pools idle capacity so someone is always using it.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="container">
+    <h2>// <span class="dim">how it works</span></h2>
+    <div class="metaphor">
+      <strong>The submarine metaphor.</strong> On submarines, crews share the same bunks across shifts. There aren't enough beds for everyone at once, so when one sailor is on watch, another sleeps in their bunk. The bunk is always "hot" - always in use. HotBunk does this with Claude Code rate limits.
+    </div>
+
+    <h2 style="font-size:1.1rem;">Account States</h2>
+    <div class="states-list">
+      <div class="state-row">
+        <span class="badge badge-interactive">Interactive</span>
+        <span class="state-desc">Owner is in an active session</span>
+        <span class="state-auto" style="color:var(--red);">No automation</span>
+      </div>
+      <div class="state-row">
+        <span class="badge badge-idle">Idle</span>
+        <span class="state-desc">No active session detected</span>
+        <span class="state-auto" style="color:var(--green);">Within policy</span>
+      </div>
+      <div class="state-row">
+        <span class="badge badge-sleeping">Sleeping</span>
+        <span class="state-desc">Inside declared sleep window</span>
+        <span class="state-auto" style="color:var(--green);">Full access</span>
+      </div>
+      <div class="state-row">
+        <span class="badge badge-throttled">Throttled</span>
+        <span class="state-desc">Hit a rate limit, recovering</span>
+        <span class="state-auto" style="color:var(--red);">Backing off</span>
+      </div>
+      <div class="state-row">
+        <span class="badge badge-cooldown">Cooldown</span>
+        <span class="state-desc">Recently throttled, deprioritized</span>
+        <span class="state-auto" style="color:var(--yellow);">Last resort</span>
+      </div>
+    </div>
+    <p class="math-summary" style="margin-top:1.25rem;">Interactive sessions have absolute priority. Automated workloads are scavengers. When an owner starts a session, automated work yields immediately.</p>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="container">
+    <h2>// <span class="dim">cli demo</span></h2>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-yellow"></span>
+        <span class="dot dot-green"></span>
+        <span class="terminal-title">hotbunk status</span>
+      </div>
+      <div class="terminal-body">
+<span class="d">$</span> <span class="w">hotbunk status</span>
+
+<span class="c" style="font-weight:700;">                    HotBunk Pool Status</span>
+<span class="d">+----------+---------------------+-------------+------+----------+----------+-----------------+</span>
+<span class="d">|</span> <span class="w">Account </span> <span class="d">|</span> <span class="w">Email              </span> <span class="d">|</span> <span class="w">State      </span> <span class="d">|</span> <span class="w">Tier</span> <span class="d">|</span> <span class="w">Sessions</span> <span class="d">|</span> <span class="w">Auto Jobs</span><span class="d">|</span> <span class="w">Headroom       </span> <span class="d">|</span>
+<span class="d">+----------+---------------------+-------------+------+----------+----------+-----------------+</span>
+<span class="d">|</span> <span class="w">work    </span> <span class="d">|</span> <span class="d">drew@company.com   </span> <span class="d">|</span> <span class="c">INTERACTIVE</span> <span class="d">|</span> <span class="w">t3  </span> <span class="d">|</span> <span class="w">   1    </span> <span class="d">|</span> <span class="w">   0    </span> <span class="d">|</span> <span class="y">[||||      ] 40%</span><span class="d">|</span>
+<span class="d">|</span> <span class="w">personal</span> <span class="d">|</span> <span class="d">drew@personal.com  </span> <span class="d">|</span> <span class="g">SLEEPING   </span> <span class="d">|</span> <span class="w">t3  </span> <span class="d">|</span> <span class="w">   0    </span> <span class="d">|</span> <span class="w">   2    </span> <span class="d">|</span> <span class="g">[||||||||  ] 80%</span><span class="d">|</span>
+<span class="d">+----------+---------------------+-------------+------+----------+----------+-----------------+</span>
+
+<span class="d">$</span> <span class="w">hotbunk submit militia -c "claude -p 'run the nightly audit'"</span>
+
+<span class="g">Job submitted:</span> militia-7f3a
+<span class="d">  Account:</span>  <span class="w">personal</span> <span class="d">(SLEEPING, 80% headroom)</span>
+<span class="d">  Command:</span>  <span class="w">claude -p 'run the nightly audit'</span>
+<span class="d">  Status:</span>   <span class="g">RUNNING</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch">
+  <div class="container">
+    <h2>// <span class="dim">architecture</span></h2>
+    <div class="arch-diagram">
+                     <span class="hl">+-----------------------+</span>
+                     <span class="hl">|   always-on machine   |</span>
+                     <span class="hl">|   - orchestrator      |</span>
+                     <span class="hl">|   - SQLite state      |</span>
+                     <span class="hl">|   - dashboard :3000   |</span>
+                     <span class="hl">+-----------+-----------+</span>
+                                 |
+                          mesh network
+                +----------------+----------------+
+                |                |                 |
+          +-----+-----+  +------+------+  +------+------+
+          | machine-1  |  | machine-2   |  | machine-3   |
+          | agent      |  | agent       |  | agent       |
+          +-----+------+  +-------------+  +-------------+
+                |
+          interactive
+          sessions here</div>
+    <div class="arch-desc">
+      <div class="arch-item"><strong>Orchestrator</strong><span>Python daemon on your always-on machine. Tracks account states, assigns jobs, exposes a REST API and dashboard.</span></div>
+      <div class="arch-item"><strong>Machine Agent</strong><span>Lightweight process on each machine. Reports active sessions, detects which account is in use, receives job assignments.</span></div>
+      <div class="arch-item"><strong>CLI</strong><span>The <code>hotbunk</code> command. Submit jobs, check status, switch accounts, edit policies.</span></div>
+      <div class="arch-item"><strong>Dashboard</strong><span>Web UI showing pool status, active jobs, usage history. FastAPI + HTMX.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="consent">
+  <div class="container">
+    <h2>// <span class="dim">consent model</span></h2>
+    <p style="color:var(--text-dim); margin-bottom:1.5rem; font-size:0.9rem;">Trust is the foundation. Every account owner stays in full control.</p>
+    <ul class="consent-list">
+      <li><strong style="color:var(--text);">Opt-in only.</strong> Nothing runs on your account until you explicitly allow it.</li>
+      <li><strong style="color:var(--text);">Policy-controlled.</strong> You choose which job types are allowed, what hours, how many concurrent.</li>
+      <li><strong style="color:var(--text);">Instant revoke.</strong> Set <code>allow_automated: false</code> and it stops. Immediately.</li>
+      <li><strong style="color:var(--text);">Full audit trail.</strong> Every job assignment is logged. See exactly what ran on your account and when.</li>
+      <li><strong style="color:var(--text);">Interactive priority is absolute.</strong> If you start a session, automated work yields. Always. No exceptions.</li>
+    </ul>
+    <p style="color:var(--text-dim); margin-top:1.5rem; font-size:0.8rem;">No credentials are shared between users. Each account's OAuth tokens stay in their own isolated directory with 600 permissions.</p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="container">
+    <h2>// <span class="dim">quick start</span></h2>
+    <div class="steps">
+      <div class="step-label">Install</div>
+      <div class="step-code"><span style="color:var(--green)">$</span> pip install hotbunk</div>
+
+      <div class="step-label">Register your first account</div>
+      <div class="step-code"><span style="color:var(--green)">$</span> claude auth login --email work@example.com
+<span style="color:var(--green)">$</span> hotbunk register work --email work@example.com</div>
+
+      <div class="step-label">Register your second account</div>
+      <div class="step-code"><span style="color:var(--green)">$</span> claude auth login --email personal@example.com
+<span style="color:var(--green)">$</span> hotbunk register personal --email personal@example.com</div>
+
+      <div class="step-label">See your pool</div>
+      <div class="step-code"><span style="color:var(--green)">$</span> hotbunk status</div>
+
+      <div class="step-label">Submit your first job</div>
+      <div class="step-code"><span style="color:var(--green)">$</span> hotbunk submit militia -c "claude -p 'run the nightly audit'"</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>MIT License &middot; <a href="https://github.com/drewbeyersdorf/hotbunk">GitHub</a></p>
+    <p style="margin-top:0.5rem;">Built for people who run agents and hate waiting.</p>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('nav a[href^="#"]').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'})})});
+</script>
+</body>
+</html>

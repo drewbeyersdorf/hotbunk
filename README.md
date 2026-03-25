@@ -4,6 +4,8 @@
 
 HotBunk is a cooperative compute orchestrator for Claude Code that load-balances automated workloads across multiple Max accounts, using idle capacity that would otherwise be wasted.
 
+![hotbunk demo](docs/demo.svg)
+
 ## The Math
 
 A Claude Max subscription costs $100-200/month. The equivalent API tokens for the same volume of Opus/Sonnet usage would cost $3,000-30,000/month. That's a 30-50x arbitrage.

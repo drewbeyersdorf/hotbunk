@@ -9,6 +9,23 @@ description = "Cooperative compute orchestrator for Claude Code"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
+authors = [
+    { name = "Drew Beyersdorf", email = "drewbeyersdorf@gmail.com" },
+]
+keywords = [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "rate-limiting",
+    "load-balancer",
+    "automation",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+]
 dependencies = [
     "click>=8.1",
     "fastapi>=0.115",
@@ -17,6 +34,12 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://hotbunk.dev"
+Repository = "https://github.com/drewbeyersdorf/hotbunk"
+Issues = "https://github.com/drewbeyersdorf/hotbunk/issues"
+Documentation = "https://hotbunk.dev"
 
 [project.scripts]
 hotbunk = "hotbunk.cli:main"
